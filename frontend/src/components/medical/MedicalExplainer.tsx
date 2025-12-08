@@ -1,31 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Brain, 
-  Languages, 
-  Copy, 
-  Volume2, 
-  History, 
+import React, { useState, useEffect } from "react";
+import {
+  Brain,
+  Languages,
+  Copy,
+  Volume2,
+  History,
   Star,
   MessageSquare,
   Download,
-  Sparkles
-} from 'lucide-react';
-import ApiService from '../../services/api';
-import LocalStorageService, { MedicalExplanation } from '../../services/localStorage';
-import toast from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
+  Sparkles,
+} from "lucide-react";
+import ApiService from "../../services/api";
+import LocalStorageService, {
+  MedicalExplanation,
+} from "../../services/localStorage";
+import toast from "react-hot-toast";
 
 interface MedicalExplainerProps {
   compact?: boolean;
 }
 
-const MedicalExplainer: React.FC<MedicalExplainerProps> = ({ compact = false }) => {
-  const [inputText, setInputText] = useState('');
-  const [language, setLanguage] = useState('english');
+const MedicalExplainer: React.FC<MedicalExplainerProps> = ({
+  compact = false,
+}) => {
+  const [inputText, setInputText] = useState("");
+  const [language, setLanguage] = useState("english");
   const [explaining, setExplaining] = useState(false);
   const [currentExplanation, setCurrentExplanation] = useState<any>(null);
   const [history, setHistory] = useState<MedicalExplanation[]>([]);
-  const [aiStatus, setAiStatus] = useState<'online' | 'offline'>('online');
+  const [aiStatus, setAiStatus] = useState<"online" | "offline">("online");
 
   useEffect(() => {
     loadHistory();
@@ -40,9 +43,9 @@ const MedicalExplainer: React.FC<MedicalExplainerProps> = ({ compact = false }) 
   const checkAIStatus = async () => {
     try {
       const health = await ApiService.checkHealth();
-      setAiStatus(health.status === 'healthy' ? 'online' : 'offline');
+      setAiStatus(health.status === "healthy" ? "online" : "offline");
     } catch {
-      setAiStatus('offline');
+      setAiStatus("offline");
     }
   };
 
@@ -57,13 +60,16 @@ const MedicalExplainer: React.FC<MedicalExplainerProps> = ({ compact = false }) 
 
   const handleExplain = async () => {
     if (!inputText.trim()) {
-      toast.error('Please enter medical text to explain');
+      toast.error("Please enter medical text to explain");
       return;
     }
 
     setExplaining(true);
     try {
-      const explanation = await ApiService.explainMedicalText(inputText, language);
+      const explanation = await ApiService.explainMedicalText(
+        inputText,
+        language
+      );
       setCurrentExplanation(explanation);
 
       // Save to history
@@ -73,24 +79,24 @@ const MedicalExplainer: React.FC<MedicalExplainerProps> = ({ compact = false }) 
         explanation: explanation.explanation,
         language: explanation.language,
         timestamp: explanation.timestamp,
-        confidence: explanation.confidence
+        confidence: explanation.confidence,
       };
 
       LocalStorageService.saveExplanation(medicalExplanation);
-      setHistory(prev => [medicalExplanation, ...prev]);
+      setHistory((prev) => [medicalExplanation, ...prev]);
 
-      toast.success('AI explained successfully!', {
-        icon: '🧠'
+      toast.success("AI explained successfully!", {
+        icon: "🧠",
       });
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'AI service unavailable');
+      toast.error(error.response?.data?.detail || "AI service unavailable");
       // Fallback
       setCurrentExplanation({
         original: inputText,
         explanation: `"${inputText}" refers to a medical concept. In simple terms, this is something you should discuss with your doctor for personalized advice.`,
-        confidence: 'low',
+        confidence: "low",
         language,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     } finally {
       setExplaining(false);
@@ -99,18 +105,18 @@ const MedicalExplainer: React.FC<MedicalExplainerProps> = ({ compact = false }) 
 
   const handleExplainDiagnosis = async () => {
     const diagnosis = inputText;
-    const notes = prompt('Add any additional notes from your doctor:') || '';
-    
+    const notes = prompt("Add any additional notes from your doctor:") || "";
+
     setExplaining(true);
     try {
       const explanation = await ApiService.explainDiagnosis(diagnosis, notes);
       setCurrentExplanation({
         ...explanation,
-        type: 'diagnosis'
+        type: "diagnosis",
       });
-      toast.success('Diagnosis explained!', { icon: '🩺' });
+      toast.success("Diagnosis explained!", { icon: "🩺" });
     } catch (error) {
-      toast.error('Error explaining diagnosis');
+      toast.error("Error explaining diagnosis");
     } finally {
       setExplaining(false);
     }
@@ -119,14 +125,21 @@ const MedicalExplainer: React.FC<MedicalExplainerProps> = ({ compact = false }) 
   const handleCopy = () => {
     if (currentExplanation?.explanation) {
       navigator.clipboard.writeText(currentExplanation.explanation);
-      toast.success('Copied to clipboard!');
+      toast.success("Copied to clipboard!");
     }
   };
 
   const handleSpeak = () => {
-    if (currentExplanation?.explanation && 'speechSynthesis' in window) {
-      const speech = new SpeechSynthesisUtterance(currentExplanation.explanation);
-      speech.lang = language === 'isizulu' ? 'zu' : language === 'afrikaans' ? 'af' : 'en-US';
+    if (currentExplanation?.explanation && "speechSynthesis" in window) {
+      const speech = new SpeechSynthesisUtterance(
+        currentExplanation.explanation
+      );
+      speech.lang =
+        language === "isizulu"
+          ? "zu"
+          : language === "afrikaans"
+          ? "af"
+          : "en-US";
       speech.rate = 0.9;
       window.speechSynthesis.speak(speech);
     }
@@ -134,7 +147,7 @@ const MedicalExplainer: React.FC<MedicalExplainerProps> = ({ compact = false }) 
 
   const handleDownload = () => {
     if (!currentExplanation) return;
-    
+
     const content = `
 Medical Explanation
 ===================
@@ -148,13 +161,13 @@ Date: ${new Date(currentExplanation.timestamp).toLocaleString()}
 Generated by Mediclinic AI with Llama 3.2
     `;
 
-    const blob = new Blob([content], { type: 'text/plain' });
+    const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `medical-explanation-${Date.now()}.txt`;
     a.click();
-    toast.success('Downloaded!');
+    toast.success("Downloaded!");
   };
 
   if (compact) {
@@ -165,11 +178,14 @@ Generated by Mediclinic AI with Llama 3.2
             <Brain className="w-5 h-5 text-primary-600" />
             AI Medical Explainer
           </h3>
-          <span className={`badge ${aiStatus === 'online' ? 'badge-success' : 'badge-critical'}`}>
-            {aiStatus === 'online' ? 'AI Online' : 'AI Offline'}
+          <span
+            className={`badge ${
+              aiStatus === "online" ? "badge-success" : "badge-critical"
+            }`}>
+            {aiStatus === "online" ? "AI Online" : "AI Offline"}
           </span>
         </div>
-        
+
         <div className="space-y-3">
           <textarea
             value={inputText}
@@ -178,24 +194,22 @@ Generated by Mediclinic AI with Llama 3.2
             className="input-field h-32 resize-none"
             rows={3}
           />
-          
+
           <div className="flex items-center gap-2">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="input-field py-2 text-sm flex-1"
-            >
+              className="input-field py-2 text-sm flex-1">
               <option value="english">🇺🇸 English</option>
               <option value="isizulu">🇿🇦 isiZulu</option>
               <option value="afrikaans">🇿🇦 Afrikaans</option>
             </select>
-            
+
             <button
               onClick={handleExplain}
               disabled={explaining || !inputText.trim()}
-              className="btn-primary px-4 py-2.5"
-            >
-              {explaining ? 'Explaining...' : 'Explain'}
+              className="btn-primary px-4 py-2.5">
+              {explaining ? "Explaining..." : "Explain"}
             </button>
           </div>
         </div>
@@ -216,14 +230,18 @@ Generated by Mediclinic AI with Llama 3.2
               <span>AI Medical Explainer</span>
             </h1>
             <p className="text-gray-600 mt-2">
-              Powered by Llama 3.2 11B. Get simple explanations of complex medical terms.
+              Powered by Llama 3.2 11B. Get simple explanations of complex
+              medical terms.
             </p>
           </div>
-          
+
           <div className="flex items-center gap-3">
-            <div className={`badge ${aiStatus === 'online' ? 'badge-success' : 'badge-critical'} px-4 py-1.5`}>
+            <div
+              className={`badge ${
+                aiStatus === "online" ? "badge-success" : "badge-critical"
+              } px-4 py-1.5`}>
               <Sparkles className="w-4 h-4 mr-1" />
-              {aiStatus === 'online' ? 'Llama 3.2 Active' : 'AI Offline'}
+              {aiStatus === "online" ? "Llama 3.2 Active" : "AI Offline"}
             </div>
           </div>
         </div>
@@ -244,8 +262,7 @@ Generated by Mediclinic AI with Llama 3.2
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
-                  className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                >
+                  className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
                   <option value="english">🇺🇸 English</option>
                   <option value="isizulu">🇿🇦 isiZulu</option>
                   <option value="afrikaans">🇿🇦 Afrikaans</option>
@@ -265,8 +282,7 @@ Generated by Mediclinic AI with Llama 3.2
               <button
                 onClick={handleExplain}
                 disabled={explaining || !inputText.trim()}
-                className="btn-primary flex items-center gap-2 px-6"
-              >
+                className="btn-primary flex items-center gap-2 px-6">
                 {explaining ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -279,12 +295,11 @@ Generated by Mediclinic AI with Llama 3.2
                   </>
                 )}
               </button>
-              
+
               <button
                 onClick={handleExplainDiagnosis}
                 disabled={explaining || !inputText.trim()}
-                className="btn-secondary flex items-center gap-2 px-6"
-              >
+                className="btn-secondary flex items-center gap-2 px-6">
                 <span className="text-lg">🩺</span>
                 Explain Diagnosis
               </button>
@@ -302,15 +317,16 @@ Generated by Mediclinic AI with Llama 3.2
                 <button
                   key={index}
                   onClick={() => setInputText(example.text)}
-                  className="text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all border border-gray-200 hover:border-primary-300 group"
-                >
+                  className="text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all border border-gray-200 hover:border-primary-300 group">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{example.icon}</span>
                     <div>
                       <div className="font-medium text-gray-800 group-hover:text-primary-700">
                         {example.text}
                       </div>
-                      <div className="text-sm text-gray-500 mt-1">Click to try</div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Click to try
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -328,45 +344,48 @@ Generated by Mediclinic AI with Llama 3.2
             </h3>
             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
               {history.length > 0 ? (
-                <AnimatePresence>
+                <>
                   {history.map((item) => (
-                    <motion.div
+                    <div
                       key={item.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      onClick={() => setCurrentExplanation({
-                        original: item.originalText,
-                        explanation: item.explanation,
-                        language: item.language,
-                        timestamp: item.timestamp,
-                        confidence: item.confidence
-                      })}
-                      className="p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200"
-                    >
+                      onClick={() =>
+                        setCurrentExplanation({
+                          original: item.originalText,
+                          explanation: item.explanation,
+                          language: item.language,
+                          timestamp: item.timestamp,
+                          confidence: item.confidence,
+                        })
+                      }
+                      className="p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200">
                       <div className="font-medium text-gray-800 line-clamp-2">
                         {item.originalText}
                       </div>
                       <div className="flex items-center justify-between mt-2">
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          item.confidence === 'high' ? 'badge-success' :
-                          item.confidence === 'medium' ? 'badge-warning' :
-                          'badge-critical'
-                        }`}>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            item.confidence === "high"
+                              ? "badge-success"
+                              : item.confidence === "medium"
+                              ? "badge-warning"
+                              : "badge-critical"
+                          }`}>
                           {item.confidence}
                         </span>
                         <span className="text-xs text-gray-500">
                           {new Date(item.timestamp).toLocaleDateString()}
                         </span>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
-                </AnimatePresence>
+                </>
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                   <p>No explanations yet</p>
-                  <p className="text-sm mt-1">Your explanations will appear here</p>
+                  <p className="text-sm mt-1">
+                    Your explanations will appear here
+                  </p>
                 </div>
               )}
             </div>
@@ -375,98 +394,99 @@ Generated by Mediclinic AI with Llama 3.2
       </div>
 
       {/* Current Explanation Display */}
-      <AnimatePresence>
-        {currentExplanation && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="medical-card"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">AI Explanation</h2>
-                <p className="text-gray-600 text-sm mt-1">
-                  Generated with Llama 3.2 • {currentExplanation.language}
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <div className={`badge ${
-                  currentExplanation.confidence === 'high' ? 'badge-success' :
-                  currentExplanation.confidence === 'medium' ? 'badge-warning' :
-                  'badge-critical'
+      {currentExplanation && (
+        <div className="medical-card animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                AI Explanation
+              </h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Generated with Llama 3.2 • {currentExplanation.language}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div
+                className={`badge ${
+                  currentExplanation.confidence === "high"
+                    ? "badge-success"
+                    : currentExplanation.confidence === "medium"
+                    ? "badge-warning"
+                    : "badge-critical"
                 } px-3`}>
-                  {currentExplanation.confidence} confidence
-                </div>
-                
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleCopy}
-                    className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
-                    title="Copy explanation"
-                  >
-                    <Copy className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={handleSpeak}
-                    className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
-                    title="Read aloud"
-                  >
-                    <Volume2 className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
-                    title="Download"
-                  >
-                    <Download className="w-5 h-5" />
-                  </button>
-                </div>
+                {currentExplanation.confidence} confidence
               </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleCopy}
+                  className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
+                  title="Copy explanation">
+                  <Copy className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleSpeak}
+                  className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
+                  title="Read aloud">
+                  <Volume2 className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
+                  title="Download">
+                  <Download className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Original Text */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="text-sm font-medium text-gray-500 mb-2">
+              Original Text
+            </div>
+            <div className="text-gray-800">{currentExplanation.original}</div>
+          </div>
+
+          {/* AI Explanation */}
+          <div className="p-6 bg-gradient-to-br from-primary-50 to-blue-50 rounded-2xl border border-primary-100">
+            <div className="text-sm font-medium text-primary-700 mb-3 flex items-center gap-2">
+              <Brain className="w-4 h-4" />
+              AI Explanation in Simple Terms
+            </div>
+            <div className="text-gray-800 leading-relaxed whitespace-pre-line">
+              {currentExplanation.explanation}
             </div>
 
-            {/* Original Text */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <div className="text-sm font-medium text-gray-500 mb-2">Original Text</div>
-              <div className="text-gray-800">{currentExplanation.original}</div>
-            </div>
+            {currentExplanation.type === "diagnosis" && (
+              <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
+                <div className="text-sm font-medium text-gray-700 mb-2">
+                  📋 Diagnosis Summary
+                </div>
+                <div className="text-gray-600 text-sm">
+                  This explanation helps you understand your diagnosis better.
+                  Always consult with your healthcare provider for personalized
+                  medical advice.
+                </div>
+              </div>
+            )}
+          </div>
 
-            {/* AI Explanation */}
-            <div className="p-6 bg-gradient-to-br from-primary-50 to-blue-50 rounded-2xl border border-primary-100">
-              <div className="text-sm font-medium text-primary-700 mb-3 flex items-center gap-2">
-                <Brain className="w-4 h-4" />
-                AI Explanation in Simple Terms
+          {/* Model Info */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse"></div>
+                <span>Generated with Llama 3.2 11B</span>
               </div>
-              <div className="text-gray-800 leading-relaxed whitespace-pre-line">
-                {currentExplanation.explanation}
-              </div>
-              
-              {currentExplanation.type === 'diagnosis' && (
-                <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
-                  <div className="text-sm font-medium text-gray-700 mb-2">📋 Diagnosis Summary</div>
-                  <div className="text-gray-600 text-sm">
-                    This explanation helps you understand your diagnosis better. Always consult with your healthcare provider for personalized medical advice.
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Model Info */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-between text-sm text-gray-500">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse"></div>
-                  <span>Generated with Llama 3.2 11B</span>
-                </div>
-                <div>
-                  {new Date(currentExplanation.timestamp).toLocaleString()}
-                </div>
+              <div>
+                {new Date(currentExplanation.timestamp).toLocaleString()}
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
