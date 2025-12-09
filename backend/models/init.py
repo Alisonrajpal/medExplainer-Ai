@@ -1,4 +1,3 @@
-# Models package
 """
 Medical AI Models Package
 
