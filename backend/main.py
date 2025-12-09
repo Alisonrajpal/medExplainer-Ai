@@ -7,200 +7,239 @@ import os
 from datetime import datetime
 import shutil
 import json
+import logging
 
+from config import settings
+from database import db
+from middleware import LoggingMiddleware, SecurityMiddleware, ErrorHandlingMiddleware
 from services.llama_service import LlamaMedicalService
-from services.document_processor import DocumentProcessor
-from services.medical_analyzer import MedicalAnalyzer
-from services.visualization_service import VisualizationService
 from services.supabase_service import SupabaseService
+
+# Import routers
+from routers.medical import router as medical_router
+from routers.documents import router as documents_router
+from routers.analysis import router as analysis_router
+from routers.auth import router as auth_router
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO if settings.debug else logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Initialize services
 llama_service = LlamaMedicalService()
-document_processor = DocumentProcessor()
-medical_analyzer = MedicalAnalyzer()
-visualization_service = VisualizationService()
 supabase_service = SupabaseService()
 
+# Create FastAPI app
 app = FastAPI(
-    title="Mediclinic AI Medical Dashboard",
+    title=settings.app_name,
     description="AI-powered medical dashboard with Llama 3.2 11B",
-    version="2.0.0"
+    version=settings.app_version,
+    docs_url=f"{settings.api_prefix}/docs" if settings.debug else None,
+    redoc_url=f"{settings.api_prefix}/redoc" if settings.debug else None,
+    openapi_url=f"{settings.api_prefix}/openapi.json" if settings.debug else None,
 )
+
+# Add middleware
+app.add_middleware(LoggingMiddleware)
+app.add_middleware(SecurityMiddleware)
+app.add_middleware(ErrorHandlingMiddleware)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Mount static files
-os.makedirs("static/uploads", exist_ok=True)
+static_dir = "static"
+os.makedirs(static_dir, exist_ok=True)
+os.makedirs(settings.upload_dir, exist_ok=True)
 os.makedirs("static/charts", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+# Include routers with API prefix
+app.include_router(medical_router, prefix=settings.api_prefix)
+app.include_router(documents_router, prefix=settings.api_prefix)
+app.include_router(analysis_router, prefix=settings.api_prefix)
+app.include_router(auth_router, prefix=settings.api_prefix)
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    """Run on application startup"""
+    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Debug mode: {settings.debug}")
+    
+    # Connect to database
+    if db.connect():
+        logger.info("Database connected successfully")
+    else:
+        logger.warning("Using local storage (database not connected)")
+    
+    # Check Llama model
+    if llama_service.model_loaded:
+        logger.info("Llama 3.2 11B model loaded successfully")
+    else:
+        logger.warning("Llama model not loaded - some features may be limited")
+
+# Shutdown event
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Run on application shutdown"""
+    logger.info("Shutting down application")
+    db.disconnect()
+
+# Root endpoint
 @app.get("/")
 async def root():
     return {
-        "app": "Mediclinic AI Medical Dashboard",
-        "version": "2.0.0",
-        "ai_model": "Llama 3.2 11B",
+        "app": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.environment,
         "status": "operational",
-        "features": [
-            "Medical text explanation",
-            "Diagnosis interpretation",
-            "Lab result analysis",
-            "Document processing",
-            "Medication explanation",
-            "Health visualization"
-        ]
+        "ai_model": "Llama 3.2 11B",
+        "api_endpoints": {
+            "medical": f"{settings.api_prefix}/medical",
+            "documents": f"{settings.api_prefix}/documents",
+            "analysis": f"{settings.api_prefix}/analysis",
+            "auth": f"{settings.api_prefix}/auth"
+        },
+        "documentation": f"{settings.api_prefix}/docs" if settings.debug else "disabled",
+        "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/api/health")
+# Health check endpoint
+@app.get("/health")
 async def health_check():
-    return {
+    """Health check endpoint"""
+    health_status = {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "services": {
             "llama_model": "loaded" if llama_service.model_loaded else "not_loaded",
-            "supabase": "connected" if supabase_service.connected else "local",
-            "document_processor": "ready",
-            "medical_analyzer": "ready"
+            "database": db.health_check(),
+            "environment": settings.environment
+        },
+        "version": settings.app_version
+    }
+    return JSONResponse(content=health_status)
+
+# Demo endpoints
+@app.get("/demo/data")
+async def get_demo_data():
+    """Get demo data for testing"""
+    return {
+        "patient": {
+            "id": "demo-patient-001",
+            "name": "John Doe",
+            "age": 45,
+            "gender": "male",
+            "conditions": ["Type 2 Diabetes", "Hypertension"],
+            "blood_type": "O+"
+        },
+        "lab_results": {
+            "glucose": 145,
+            "hba1c": 6.8,
+            "cholesterol": 220,
+            "ldl": 140,
+            "hdl": 42,
+            "triglycerides": 185,
+            "creatinine": 1.1,
+            "sodium": 140
+        },
+        "medications": [
+            {"name": "Metformin", "dosage": "500mg", "frequency": "Twice daily", "status": "active"},
+            {"name": "Lisinopril", "dosage": "10mg", "frequency": "Once daily", "status": "active"}
+        ],
+        "vitals": {
+            "blood_pressure": {"systolic": 135, "diastolic": 85},
+            "heart_rate": 72,
+            "temperature": 98.6,
+            "weight_kg": 85.5,
+            "height_cm": 175
         }
     }
 
-@app.post("/api/explain")
-async def explain_medical(
-    text: str = Form(...),
-    context: Optional[str] = Form(""),
-    language: str = Form("english")
-):
-    """Explain medical text"""
-    explanation = llama_service.explain_medical_text(text, context)
-    return JSONResponse(content=explanation)
-
-@app.post("/api/explain-diagnosis")
-async def explain_diagnosis(
-    diagnosis: str = Form(...),
-    notes: Optional[str] = Form("")
-):
-    """Explain medical diagnosis"""
-    explanation = llama_service.explain_diagnosis(diagnosis, notes)
-    return JSONResponse(content=explanation)
-
-@app.post("/api/analyze-lab")
-async def analyze_lab_results(lab_data: dict):
-    """Analyze lab results with AI"""
-    analysis = llama_service.analyze_lab_results(lab_data)
-    
-    # Also run through medical analyzer for categorization
-    categorization = medical_analyzer.categorize_lab_results(lab_data)
-    analysis["categorization"] = categorization
-    
-    return JSONResponse(content=analysis)
-
-@app.post("/api/explain-medication")
-async def explain_medication(medication: str = Form(...)):
-    """Explain medication"""
-    explanation = llama_service.explain_medication(medication)
-    return JSONResponse(content=explanation)
-
-@app.post("/api/upload-document")
-async def upload_document(
-    file: UploadFile = File(...),
-    document_type: str = Form("lab_report"),
-    patient_id: str = Form("demo-patient")
-):
-    """Upload and process medical document"""
-    
-    # Save file
-    file_path = f"static/uploads/{patient_id}_{datetime.now().timestamp()}_{file.filename}"
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Process document
-    result = document_processor.process_document(file_path, document_type)
-    
-    # Save to database
-    supabase_service.save_document({
-        "patient_id": patient_id,
-        "filename": file.filename,
-        "document_type": document_type,
-        "file_path": file_path,
-        "processed_data": result,
-        "uploaded_at": datetime.now().isoformat()
-    })
-    
-    return JSONResponse(content={
-        "success": True,
-        "filename": file.filename,
-        "document_type": document_type,
-        "processed_data": result,
-        "file_url": f"/{file_path}"
-    })
-
-@app.get("/api/documents/{patient_id}")
-async def get_patient_documents(patient_id: str):
-    """Get patient documents"""
-    documents = supabase_service.get_patient_documents(patient_id)
-    return JSONResponse(content={"documents": documents})
-
-@app.post("/api/generate-chart")
-async def generate_chart(chart_data: dict):
-    """Generate medical chart"""
-    chart_type = chart_data.get("type", "blood_work")
-    data = chart_data.get("data", {})
-    
-    chart_result = visualization_service.generate_chart(chart_type, data)
-    
-    return JSONResponse(content=chart_result)
-
-@app.get("/api/patient/{patient_id}/summary")
-async def get_patient_summary(patient_id: str):
-    """Get comprehensive patient summary"""
-    # Get documents
-    documents = supabase_service.get_patient_documents(patient_id)
-    
-    # Get lab results from documents
-    lab_results = []
-    for doc in documents:
-        if doc.get("document_type") == "lab_report":
-            lab_results.append(doc.get("processed_data", {}))
-    
-    # Analyze if we have lab results
-    analysis = {}
-    if lab_results:
-        latest_labs = lab_results[-1]
-        analysis = llama_service.analyze_lab_results(latest_labs)
-    
-    # Generate health summary
-    summary = {
-        "patient_id": patient_id,
-        "document_count": len(documents),
-        "lab_reports": len([d for d in documents if d.get("document_type") == "lab_report"]),
-        "doctor_notes": len([d for d in documents if d.get("document_type") == "doctor_note"]),
-        "latest_analysis": analysis,
-        "last_updated": datetime.now().isoformat()
+@app.post("/demo/analyze")
+async def demo_analysis():
+    """Demo analysis endpoint"""
+    demo_data = {
+        "glucose": 145,
+        "hba1c": 6.8,
+        "cholesterol": 220,
+        "ldl": 140,
+        "hdl": 42,
+        "triglycerides": 185
     }
     
-    return JSONResponse(content=summary)
-
-@app.post("/api/auth/login")
-async def login(email: str = Form(...), password: str = Form(...)):
-    """User login"""
-    user = supabase_service.authenticate_user(email, password)
-    if user:
+    try:
+        analysis = llama_service.analyze_lab_results(demo_data)
+        
         return JSONResponse(content={
             "success": True,
-            "user": user,
-            "token": "demo-token-for-auth"  # In production, use JWT
+            "demo_data": demo_data,
+            "analysis": analysis,
+            "note": "This is demo analysis using sample data",
+            "timestamp": datetime.now().isoformat()
         })
-    else:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    except Exception as e:
+        logger.error(f"Demo analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# File upload demo endpoint
+@app.post("/demo/upload")
+async def demo_upload(file: UploadFile = File(...)):
+    """Demo file upload endpoint"""
+    try:
+        # Create uploads directory if it doesn't exist
+        os.makedirs("static/uploads/demo", exist_ok=True)
+        
+        # Save file
+        file_path = f"static/uploads/demo/{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Get file info
+        file_size_kb = os.path.getsize(file_path) / 1024
+        
+        return JSONResponse(content={
+            "success": True,
+            "filename": file.filename,
+            "file_size_kb": round(file_size_kb, 2),
+            "file_path": f"/{file_path}",
+            "message": "File uploaded successfully (demo)",
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Demo upload error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Status endpoint
+@app.get("/status")
+async def status_check():
+    """Application status check"""
+    return {
+        "application": settings.app_name,
+        "version": settings.app_version,
+        "status": "running",
+        "environment": settings.environment,
+        "debug_mode": settings.debug,
+        "current_time": datetime.now().isoformat(),
+        "uptime": "unknown"  # You can add uptime calculation here
+    }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        app,
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=settings.debug
+    )
